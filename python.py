@@ -15,10 +15,12 @@ except ImportError:
     st.error("Lỗi: Thư viện 'google-genai' chưa được cài đặt. Vui lòng chạy `pip install google-genai`.")
     st.stop()
     
+# THAY ĐỔI LỚN: IMPORT CÁC HÀM LẤY BÁO CÁO TÀI CHÍNH TRỰC TIẾP
 try:
-    from vnstock import Vnstock
+    # Import các hàm top-level API để tương thích với các phiên bản vnstock mới nhất
+    from vnstock import financial_balance_sheet, financial_income_statement, cash_flow 
 except ImportError:
-    st.error("Lỗi: Thư viện 'vnstock' chưa được cài đặt. Vui lòng chạy `pip install vnstock`.")
+    st.error("Lỗi: Không thể import các hàm tài chính từ 'vnstock'. Vui lòng chạy `pip install vnstock --upgrade`.")
     st.stop()
 
 # --- SỬA LỖI ATTRIBUTEERROR ---
@@ -50,25 +52,28 @@ PERIOD_OPTIONS = {
     'year': 'Theo Năm',
     'quarter': 'Theo Quý'
 }
-SOURCE_DEFAULT = 'TCBS'
+SOURCE_DEFAULT = 'VCI' # Đã đổi thành VCI để nhất quán, nhưng không cần thiết khi dùng hàm API mới
 
 
-# --- HÀM TẢI DỮ LIỆU TÀI CHÍNH TỪ VNSTOCK ---
+# --- HÀM TẢI DỮ LIỆU TÀI CHÍNH TỪ VNSTOCK (ĐÃ CHỈNH SỬA) ---
 @st.cache_data(show_spinner="Đang trích xuất dữ liệu Báo cáo Tài chính...")
 def get_financial_data(symbol, period='year', source=SOURCE_DEFAULT):
     """
     Tải Bảng Cân đối Kế toán, Báo cáo KQKD, và Báo cáo Lưu chuyển Tiền tệ
-    cho một mã cổ phiếu sử dụng Vnstock.
+    cho một mã cổ phiếu sử dụng Vnstock (hàm API cấp cao).
     """
-    st.info(f"Đang tải dữ liệu tài chính cho mã **{symbol}** (Nguồn: VCI, Kỳ: {period})...")
+    st.info(f"Đang tải dữ liệu tài chính cho mã **{symbol}** (Nguồn: Vnstock API, Kỳ: {period})...")
     financial_data = {}
     
+    # CHỈNH SỬA CÁCH GỌI HÀM: Dùng hàm top-level API đã import
     try:
-        stock_api = Vnstock().stock(symbol=symbol, source=source)
+        # report_type được truyền là 'quater' hoặc 'year' để tương thích với API
+        report_type_param = 'quater' if period == 'quarter' else 'year'
         
-        financial_data['balance_sheet'] = stock_api.finance.balance_sheet(period=period)
-        financial_data['income_statement'] = stock_api.finance.income_statement(period=period)
-        financial_data['cash_flow'] = stock_api.finance.cash_flow(period=period)
+        # Hàm vnstock mới nhận period=year/quater (không có t)
+        financial_data['balance_sheet'] = financial_balance_sheet(symbol=symbol, report_type=report_type_param, limit=10)
+        financial_data['income_statement'] = financial_income_statement(symbol=symbol, report_type=report_type_param, limit=10)
+        financial_data['cash_flow'] = cash_flow(symbol=symbol, report_type=report_type_param, limit=10) # limit=10 là mặc định
 
         st.success(f"Tải dữ liệu thành công cho **{symbol}**.")
         return financial_data
